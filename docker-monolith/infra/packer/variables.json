@@ -1,0 +1,6 @@
+{
+	"service_account_key_file": "/root/keys/terraform-service-key.json",
+	"folder_id": "b1gf67o53kg106nnl0fl",
+	"subnet_id": "e9bfhc9odjsriv1htsdd",
+	"source_image_family": "ubuntu-2004-lts"
+}
