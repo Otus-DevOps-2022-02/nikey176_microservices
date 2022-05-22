@@ -1,0 +1,4 @@
+[docker-hosts]
+docker-reddit-1 ansible_ssh_host=51.250.86.24
+docker-reddit-2 ansible_ssh_host=51.250.83.151
+docker-reddit-3 ansible_ssh_host=51.250.70.109

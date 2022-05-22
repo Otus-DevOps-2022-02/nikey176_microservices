@@ -1,0 +1,25 @@
+---
+- name: Docker installation
+  hosts: default
+  become: true
+
+  tasks:
+  - name: Add Docker’s official GPG key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+  
+  - name: Add Docker Repository
+    apt_repository:
+      repo: deb https://download.docker.com/linux/ubuntu focal stable
+      state: present
+
+  - name: Install docker
+    apt:
+      name: "{{ item }}"
+      update_cache: yes
+    loop:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin

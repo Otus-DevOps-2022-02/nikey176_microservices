@@ -1,0 +1,33 @@
+---
+- name: otus-reddit
+  hosts: docker-hosts
+  become: true
+
+  tasks:
+#  - name: Create symbolic link 
+#    file:
+#      src: "/usr/bin/python3.5"
+#      dest: "/usr/bin/python"
+#      state: link
+  
+  - name: Install pip
+    apt:
+      name: "{{ item }}"
+      update_cache: yes
+      state: latest
+    loop:
+      - python3-pip
+
+  - name: Install docker module
+    pip:
+      name: docker
+      executable: pip3
+
+  - name: Run container
+    community.docker.docker_container:
+      name: reddit
+      state: started
+      image: nchernukha/otus-reddit:1.0
+      command: 
+      ports:
+      - "9292:9292"
