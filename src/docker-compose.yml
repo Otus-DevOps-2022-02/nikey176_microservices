@@ -32,7 +32,7 @@ services:
 
 volumes:
   post_db:
-    name: post_db
+
 
 networks:
   front_net:
