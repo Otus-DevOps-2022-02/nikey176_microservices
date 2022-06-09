@@ -21,6 +21,7 @@ build_job:
 
 reddit_start:
   stage: build
+  image: docker:latest
   script:
     - docker image build -t reddit-ci .
   environment:
