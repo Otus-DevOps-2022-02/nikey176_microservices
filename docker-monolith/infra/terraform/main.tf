@@ -22,8 +22,8 @@ resource "yandex_compute_instance" "reddit" {
   }
 
   resources {
-    cores         = 2
-    memory        = 2
+    cores         = 4
+    memory        = 6
     core_fraction = 20
   }
 
