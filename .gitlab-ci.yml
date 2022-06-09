@@ -23,9 +23,9 @@ reddit_start:
   stage: build
   image: docker:latest
   before_script:
-  - echo $PWD
+    - echo $PWD
   script:
-    - docker image build -t reddit-ci .
+    - docker image build -t reddit-ci docker-monolith/Dockerfile
   environment:
     name: branch/$CI_COMMIT_REF_NAME
 
