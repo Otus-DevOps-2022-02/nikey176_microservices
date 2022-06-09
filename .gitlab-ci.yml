@@ -23,6 +23,7 @@ reddit_start:
   stage: build
   image: docker:latest
   script:
+    - echo $PWD
     - docker image build -t reddit-ci .
   environment:
     name: branch/$CI_COMMIT_REF_NAME
