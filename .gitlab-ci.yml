@@ -21,7 +21,9 @@ build_job:
 
 reddit_start:
   stage: build
-  image: docker:dind
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
   before_script:
     - echo $PWD
   script:
