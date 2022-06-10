@@ -21,7 +21,7 @@ build_job:
 
 reddit_start:
   stage: build
-  image: docker:latest
+  image: docker:dind
   before_script:
     - echo $PWD
   script:
