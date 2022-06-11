@@ -9,6 +9,9 @@ stages:
 
 variables:
   DATABASE_URL: 'mongodb://mongo/user_posts'
+  DOCKER_HOST: tcp://docker:2375/
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
 
 before_script:
   - cd reddit
@@ -24,10 +27,13 @@ reddit_start:
   image: docker:20.10.16
   services:
     - docker:20.10.16-dind
+
   before_script:
-    - echo $PWD
+    - docker info
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
   script:
-    - docker image build -t reddit-ci docker-monolith/
+    - docker image build -t nchernukha/reddit-ci:$CI_COMMIT_REF_NAME docker-monolith/
+    - docker image push nchernukha/reddit-ci:$CI_COMMIT_REF_NAME
   environment:
     name: branch/$CI_COMMIT_REF_NAME
 
@@ -53,9 +59,14 @@ deploy_dev_job:
 
 branch review:
   stage: review
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - cd reddit
   script:
     - echo "Deploy to $CI_ENVIRONMENT_SLUG"
-    - docker container run -d --name reddit -p 9292:9292 reddit-ci
+    - docker container run -d --name reddit -p 9292:9292 nchernukha/reddit-ci:$CI_COMMIT_REF_NAME
   environment:
     name: branch/$CI_COMMIT_REF_NAME
     url: http://$CI_ENVIRONMENT_SLUG.example.com
