@@ -1,0 +1,54 @@
+---
+- name: GitLab installation
+  hosts: all
+  become: true
+
+  collections:
+    - community.docker
+
+  tasks:
+  - name: Install pip
+    apt:
+      update_cache: yes
+      name:
+        - python3-pip
+
+  - name: Install docker module
+    pip:
+      name: docker
+  
+  - name: Create a directory if it does not exist
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: '0755'
+    loop:
+      - /srv/gitlab/config
+      - /srv/gitlab/data
+      - /srv/gitlab/logs    
+  
+  - name: Start GitLab container
+    community.docker.docker_container:
+      image: gitlab/gitlab-ce:latest
+      name: gitlab
+      restart_policy: always
+      hostname: gitlab.example.com
+      env:
+        GITLAB_OMNIBUS_CONFIG: "external_url 'http://{{ ansible_facts.eth0.ipv4.address }}'"
+      ports:
+        - "80:80"
+        - "443:443"
+        - "2222:22"
+      volumes:
+        - /srv/gitlab/config:/etc/gitlab
+        - /srv/gitlab/logs:/var/log/gitlab
+        - /srv/gitlab/data:/var/opt/gitlab
+
+  - name: Start GitLab Runner container
+    community.docker.docker_container:
+      image: gitlab/gitlab-runner:latest
+      name: gitlab-runner
+      restart_policy: always
+      volumes:
+        - /srv/gitlabrunner/config:/etc/gitlab-runner
+        - /var/run/docker.sock:/var/run/docker.sock

@@ -69,3 +69,91 @@ Docker-compose
 - подключаем соответствующие тома к директории _/data_ для каждого сервиса
 ##### Запуск puma для ruby-приложений в дебаг-режиме и с двумя воркерами
 - переопределяем `CMD` команду из Dockerfile при помощи директивы _command_
+
+Устройство GitLab CI
+---
+#### 1. Omnibus-установка GitLab CI
+- устанавливаем Docker на сервер
+- создаем директории для GitLab
+```
+# mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+```
+- настраиваем compose-файл для установки GitLab
+```
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://51.250.70.70'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+```
+
+#### 2. Автоматизация установки GitLab при помощи Ansible
+- docker-monolith/infra/ansible/gitlab.yml
+
+#### 3. Подключение репозитория GitLab к локальному репозиторию
+- локально выполняем команды:
+```
+# git checkout -b gitlab-ci-1
+# git remote add gitlab http://51.250.70.70/homework/example.git
+# git push gitlab gitlab-ci-1
+```
+где 
+- http://51.250.70.70 - пример адреса GitLab-сервера,
+- /homework/example.git - пример GitLab-репозитория
+
+#### 4. Определение CI/CD Pipeline
+- создаем в корне GitLab-репозитория файл _.gitlab-ci.yml_
+
+#### 5. GitLab-runner для запуска Pipeline
+- добавляем раннер на сервер
+```
+docker run -d --name gitlab-runner --restart always -v /srv/gitlabrunner/
+config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock
+gitlab/gitlab-runner:latest
+```
+- регистрируем раннер
+```
+docker exec -it gitlab-runner gitlab-runner register \
+  --url http://51.250.70.70/ --non-interactive --locked=false \
+  --name DockerRunner --executor docker --docker-image alpine:latest \
+  --registration-token GR134894129WutKtGssRtCYxrniyb \
+  --tag-list "linux,xenial,ubuntu,docker" --run-untagged \
+  --docker-privileged
+```
+
+#### 6. Добавление приложения и тестов в проект
+- добавляем reddit-приложение
+```
+# git clone https://github.com/express42/reddit.git && rm -rf ./reddit/.git
+# git add reddit/
+# git commit -m "Add reddit app"
+# git push gitlab gitlab-ci-1
+```
+- добавляем файл с тестами: reddit/simpletest.rb
+- подключаем тесты в задаче test_unit_job в .gitlab-ci.yml
+- добавляем библиотеку rack-test в reddit/Gemfile
+
+### 7. Окружения
+- в .gitlab-ci.yml определены окружения dev, beta, production
+- в .gitlab-ci.yml настроены динамические окружения с помощью переменных $CI_COMMIT_REF_NAME и $CI_ENVIRONMENT_SLUG
+
+### 8. Автоматизация развертывания GitLab Runner
+- добавлена задача _Start GitLab Runner container_ в плейбук docker-monolith/infra/ansible/gitlab.yml
+
+### 9. Запуск reddit на динамически создаваемых окружениях
+- добавлена задача reddit_start в .gitlab-ci.yml, в которой:
+a) определен docker-executor
+b) добавлен скрипт для подключения внешнего реестра образов
+c) добавлены скрипты для создания и выгрузки образа reddit
+d) определены динамически создаваемые окружения
+- в задачу branch review добавлен скрипт запуска контейнера с reddit
