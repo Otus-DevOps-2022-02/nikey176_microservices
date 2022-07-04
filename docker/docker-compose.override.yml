@@ -8,7 +8,6 @@ services:
       - post_db:/data/db
     env_file: .env
   ui:
-    build: ./ui
     image: ${USERNAME}/${UI_IMAGE}
     command: [ "puma", "--debug", "-w", "2" ]
     ports:
@@ -19,7 +18,6 @@ services:
       - ui_app:/app
     env_file: .env
   post:
-    build: ./post-py
     image: ${USERNAME}/${POST_IMAGE}
     networks:
       - front_net
@@ -28,7 +26,6 @@ services:
       - post_app:/app
     env_file: .env
   comment:
-    build: ./comment
     image: ${USERNAME}/${COMMENT_IMAGE}
     command: [ "puma", "--debug", "-w", "2" ]
     networks:

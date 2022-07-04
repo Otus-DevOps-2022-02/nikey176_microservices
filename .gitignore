@@ -15,3 +15,4 @@ jdauphant.nginx
 .cache
 .pytest_cache
 
+.env
