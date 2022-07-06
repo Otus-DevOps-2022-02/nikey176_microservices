@@ -1,0 +1,93 @@
+version: '3.3'
+services:
+  post_db:
+    image: ${MONGODB_IMAGE}
+    networks:
+      back_net:
+        aliases:
+          - post_db
+          - comment_db
+    volumes:
+      - post_db:/data/db
+    env_file: .env
+  ui:
+    image: ${USERNAME}/${UI_IMAGE}
+    ports:
+      - ${UI_PORT}:9292/tcp
+    networks:
+      front_net:
+        aliases:
+          - ui
+    env_file: .env
+  post:
+    image: ${USERNAME}/${POST_IMAGE}
+    networks:
+      - front_net
+      - back_net
+    env_file: .env
+  comment:
+    image: ${USERNAME}/${COMMENT_IMAGE}
+    networks:
+      front_net:
+        aliases:
+          - comment
+      back_net:
+        aliases:
+          - comment
+    env_file: .env
+  prometheus:
+    image: ${USERNAME}/prometheus
+    networks:
+      - front_net
+      - back_net
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    command: # Передаем доп параметры в командной строке
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d' # Задаем время хранения метрик в 1 день
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    networks:
+      - front_net
+      - back_net
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.32.0
+    networks:
+      - back_net
+    ports:
+      - '9216:9216'
+      - '17001:17001'
+    env_file: .env
+    command:
+      - '--collector.topmetrics'
+  blackbox-exporter:
+    image: ${USERNAME}/blackbox_exporter
+    volumes:
+      - blackbox_config:/config
+    ports:
+      - '9115:9115'
+    networks:
+      - front_net
+      - back_net
+
+volumes:
+  post_db:
+  prometheus_data:
+  blackbox_config:
+
+
+networks:
+  front_net:
+  back_net:
