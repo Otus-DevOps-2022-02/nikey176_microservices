@@ -1,14 +1,16 @@
-FROM ubuntu:16.04
-RUN apt-get update \
-    && apt-get install -y ruby-full ruby-dev build-essential \
-    && gem install bundler --no-ri --no-rdoc
+FROM alpine:3.14.6
+
+RUN apk update
+RUN apk add --no-cache ruby-full ruby-dev ruby-bundler build-base \
+    && gem install bundler --version 1.17.3 --no-document
 
 ENV APP_HOME /app
 RUN mkdir $APP_HOME
 
 WORKDIR $APP_HOME
 ADD Gemfile* $APP_HOME/
-RUN bundle install
+
+RUN bundle update --bundler && bundle install
 ADD . $APP_HOME
 
 ENV POST_SERVICE_HOST post
