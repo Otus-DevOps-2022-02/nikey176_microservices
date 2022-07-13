@@ -1,12 +1,15 @@
-FROM ruby:2.2
-RUN apt-get update -qq && apt-get install -y build-essential
+FROM alpine:3.14.6
+
+RUN apk update
+RUN apk add --no-cache ruby-full ruby-dev ruby-bundler build-base \
+    && gem install bundler --version 1.17.3 --no-document
 
 ENV APP_HOME /app
 RUN mkdir $APP_HOME
 
 WORKDIR $APP_HOME
 ADD Gemfile* $APP_HOME/
-RUN bundle install
+RUN bundle update --bundler && bundle install
 ADD . $APP_HOME
 
 ENV COMMENT_DATABASE_HOST comment_db

@@ -19,12 +19,26 @@ services:
         aliases:
           - ui
     env_file: .env
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
   post:
     image: ${USERNAME}/${POST_IMAGE}
     networks:
       - front_net
       - back_net
     env_file: .env
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
   comment:
     image: ${USERNAME}/${COMMENT_IMAGE}
     networks:
@@ -35,6 +49,14 @@ services:
         aliases:
           - comment
     env_file: .env
+    environment:
+      - POST_DATABASE_HOST=post_db
+      - POST_DATABASE=posts
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+    depends_on:
+      - post_db
+    ports:
+      - "5000:5000"
   prometheus:
     image: ${USERNAME}/prometheus
     networks:
