@@ -1,0 +1,93 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Удаление swapfile из /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+
+  - name: Отключение swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+
+  - name: Disable IPtables
+    command: iptables -F
+
+  - name: Добавление GPG ключа Kubernetes
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
+
+  - name: Добавление репозитория Kubernetes
+    apt_repository:
+      repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: 'kubernetes'
+
+  - name: Установка Kubernetes
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+        - kubelet 
+        - kubeadm 
+        - kubectl
+
+  - name: Удаление config.toml
+    file:
+      state: absent
+      path: /etc/containerd/config.toml
+
+  - name: Рестарт kubelet
+    service:
+      name: kubelet
+      daemon_reload: yes
+      state: restarted
+
+  - name: Рестарт containerd
+    service:
+      name: containerd
+      daemon_reload: yes
+      state: restarted
+
+  - name: Инициализация кластера Kubernetes
+    when: inventory_hostname in ['k8s-node-1']
+    command: kubeadm init --apiserver-advertise-address="0.0.0.0" --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint={{ ansible_host }}
+
+  - name: Настройка Kubernetes для пользователя ubuntu
+    command: "{{ item }}"
+    when: inventory_hostname in ['k8s-node-1']
+    with_items:
+    - mkdir -p /home/ubuntu/.kube
+    - cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+    - chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+  - name: Установка сетевого плагина Flannel
+    become: false
+    when: inventory_hostname in ['k8s-node-1']
+    command: kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+
+  - name: Получение join-команды для подключения воркеров
+    become: false
+    when: inventory_hostname in ['k8s-node-1']
+    command: kubeadm token create --print-join-command
+    register: join_command
+
+  - name: Добавление join-команды в файл
+    when: inventory_hostname in ['k8s-node-1']
+    local_action: "copy content='{{ join_command.stdout_lines[0] }}' dest=join-command"
+
+  - name: Копирование файла с join-командой на воркер
+    when: inventory_hostname in ['k8s-node-2']
+    copy: src=join-command dest=/tmp/kubeadm-join.sh mode=0777
+
+  - name: Подключение воркера к кластеру
+    when: inventory_hostname in ['k8s-node-2']
+    command: sh /tmp/kubeadm-join.sh
