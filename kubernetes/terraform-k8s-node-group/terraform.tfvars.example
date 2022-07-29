@@ -1,0 +1,13 @@
+cloud_id                 = "abcd7rb93cj5rjsdlxyz"
+folder_id                = "abcf67o53kg106nnlxyz"
+zone                     = "ru-central1-a"
+service_account_key_file = "/path/to/key.json"
+cluster                  = "catueyt65gdcg9u8ghhn"
+scale                    = 2
+platform                 = "standard-v2"
+cores                    = 2
+memory                   = 8
+core_fraction            = 20
+subnets                  = ["e9bfhc9otyrriv1htsdd"]
+disk_size                = 64
+disk_type                = "network-hdd"
