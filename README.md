@@ -223,3 +223,17 @@ Kubernetes. Запуск кластера и приложения
 - конфигурация группы узлов расположена в папке kubernetes/terraform-k8s-node-group
 #### 3. Готовим YAML-манифесты для включения Kubernetes Dashboard
 - манифесты расположены в папке kubernetes/dashboard
+
+Kubernetes. Networks, storages
+---
+#### 1. Сетевое взаимодействие
+- установлен Ingress-контроллер
+- настроен Ingress для компонента ui
+- настроен прием только HTTPS-трафика при помощи Secret
+- в рамках дополнительного задания TLS-Secret описан в виде YAML-манифеста
+- к k8s-кластеру подключен плагин Calico для использования NetworkPolicy
+- настроена сетевая политика (NetworkPolicy) для компонента mongo: разрешены входящие подключения от компонентов comment и post
+#### 2. Хранилище
+- в Yandex Cloud создан диск
+- настроены PersistentVolume (PV) и PersistentVolumeClaim (PVC)
+- PVC подключен к развертыванию mongo для постоянного хранения данных БД
