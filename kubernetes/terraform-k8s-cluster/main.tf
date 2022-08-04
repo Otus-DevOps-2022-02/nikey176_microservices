@@ -22,6 +22,7 @@ resource "yandex_kubernetes_cluster" "nch-cluster" {
   release_channel = var.channel
   node_ipv4_cidr_mask_size = 24
   network_id = var.network
+  network_policy_provider = "CALICO"
 
   master {
     version = var.master_version
