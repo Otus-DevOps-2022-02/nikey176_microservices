@@ -1,0 +1,104 @@
+image: alpine:latest
+
+variables:
+  GITLAB_HOST: nicher2.online
+  CI_REGISTRY: "index.docker.io"
+  CI_APPLICATION_REPOSITORY: $CI_REGISTRY/$CI_PROJECT_PATH
+  CI_APPLICATION_TAG: $CI_COMMIT_REF_SLUG
+  CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
+  TILLER_NAMESPACE: "kube-system"
+
+stages:
+  - test
+  - staging
+  - production
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - triggers
+    - branches
+
+staging:
+  stage: staging
+  script:
+    - apk add -U openssl curl tar gzip bash ca-certificates git
+    - wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    - wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    - apk add glibc-2.23-r3.apk
+    - rm glibc-2.23-r3.apk
+    - echo "helm"
+    - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    - chmod 700 get_helm.sh
+    - ./get_helm.sh
+    - helm version --client
+    - curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x /usr/bin/kubectl
+    - kubectl version --client
+    - kubectl describe namespace "$KUBE_NAMESPACE" || kubectl create namespace "$KUBE_NAMESPACE"
+    - echo $KUBE_NAMESPACE
+    - helm dep update reddit
+    - helm upgrade --install
+      --wait
+      --set ui.ingress.host="$host"
+      --set ui.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/ui/-/raw/master/VERSION)"
+      --set post.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/post/-/raw/master/VERSION)"
+      --set comment.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/comment/-/raw/master/VERSION)"
+      --namespace="$KUBE_NAMESPACE"
+      --version="$CI_PIPELINE_ID-$CI_JOB_ID"
+      "$name"
+      reddit
+  variables:
+    KUBE_NAMESPACE: staging
+    track: "${1-stable}"
+    name: "$CI_ENVIRONMENT_SLUG"
+  environment:
+    name: staging
+    url: http://staging
+  only:
+    refs:
+      - master
+    kubernetes: active
+
+production:
+  stage: production
+  script:
+    - apk add -U openssl curl tar gzip bash ca-certificates git
+    - wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    - wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    - apk add glibc-2.23-r3.apk
+    - rm glibc-2.23-r3.apk
+    - echo "helm"
+    - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    - chmod 700 get_helm.sh
+    - ./get_helm.sh
+    - helm version --client
+    - curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x /usr/bin/kubectl
+    - kubectl version --client
+    - kubectl describe namespace "$KUBE_NAMESPACE" || kubectl create namespace "$KUBE_NAMESPACE"
+    - echo $KUBE_NAMESPACE
+    - helm dep update reddit
+    - helm upgrade --install
+      --wait
+      --set ui.ingress.host="$host"
+      --set ui.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/ui/-/raw/master/VERSION)"
+      --set post.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/post/-/raw/master/VERSION)"
+      --set comment.image.tag="$(curl https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/comment/-/raw/master/VERSION)"
+      --namespace="$KUBE_NAMESPACE"
+      --version="$CI_PIPELINE_ID-$CI_JOB_ID"
+      "$name"
+      reddit
+  variables:
+    KUBE_NAMESPACE: production
+    name: "$CI_ENVIRONMENT_SLUG"
+    track: "${1-stable}"
+  environment:
+    name: production
+    url: http://production
+  only:
+    refs:
+      - master
+    kubernetes: active

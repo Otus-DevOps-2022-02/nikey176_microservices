@@ -1,0 +1,194 @@
+
+---
+image: alpine:latest
+
+variables:
+  GITLAB_HOST: nicher2.online
+  CI_REGISTRY: "index.docker.io"
+  CI_APPLICATION_REPOSITORY: $CI_REGISTRY/$CI_PROJECT_PATH
+  CI_APPLICATION_TAG: $CI_COMMIT_REF_SLUG
+  CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
+  TILLER_NAMESPACE: "kube-system"
+
+stages:
+  - build
+  - test
+  - review
+  - release
+  - cleanup
+
+build:
+  stage: build
+  image: docker:git
+  services:
+    - docker:18.09.7-dind
+  script:
+    - >
+      if ! docker info &>/dev/null; then
+        if [ -z "$DOCKER_HOST" -a "$KUBERNETES_PORT" ]; then
+          export DOCKER_HOST='tcp://localhost:2375'
+        fi
+      fi
+    - echo "Building Dockerfile-based application..."
+    - echo `git show --format="%h" HEAD | head -1` > build_info.txt
+    - echo `git rev-parse --abbrev-ref HEAD` >> build_info.txt
+    - docker build -t "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" .
+    - >
+      if [[ -n "$CI_REGISTRY_USER" ]]; then
+        echo "Logging to GitLab Container Registry with CI credentials..."
+        docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+        echo ""
+      fi
+    - echo "Pushing to GitLab Container Registry..."
+    - docker push "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+    - echo ""
+  variables:
+    DOCKER_DRIVER: overlay2
+  only:
+    - branches
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - branches
+
+release:
+  stage: release
+  image: docker
+  services:
+    - docker:18.09.7-dind
+  script:
+    - >
+      if ! docker info &>/dev/null; then
+        if [ -z "$DOCKER_HOST" -a "$KUBERNETES_PORT" ]; then
+          export DOCKER_HOST='tcp://localhost:2375'
+        fi
+      fi
+    - echo "Updating docker images ..."
+    - >
+      if [[ -n "$CI_REGISTRY_USER" ]]; then
+        echo "Logging to GitLab Container Registry with CI credentials..."
+        docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+        echo ""
+      fi
+    - docker pull "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+    - docker tag "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
+    - docker push "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
+    - echo ""
+  only:
+    - master
+
+review:
+  stage: review
+  script:
+    - set -x
+    - echo ${kube_config} | base64 -d > ${KUBECONFIG}
+    - echo ${ca_pem} | base64 -d > /root/ca.pem
+    - apk add -U openssl curl tar gzip bash ca-certificates git
+    - wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    - wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    - apk add glibc-2.23-r3.apk
+    - rm glibc-2.23-r3.apk
+    - wget https://storage.googleapis.com/pub/gsutil.tar.gz
+    - tar -xzf gsutil.tar.gz -C $HOME
+    - export PATH=${PATH}:$HOME/gsutil
+    - curl https://get.helm.sh/helm-v2.13.1-linux-amd64.tar.gz | tar zx
+    - mv linux-amd64/helm /usr/bin/
+    - helm version --client
+    - curl  -o /usr/bin/sync-repo.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/sync-repo.sh
+    - chmod a+x /usr/bin/sync-repo.sh
+    - curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x /usr/bin/kubectl
+    - kubectl version --client
+    - kubectl describe namespace "$KUBE_NAMESPACE" || kubectl create namespace "$KUBE_NAMESPACE"
+    - echo "Checking Tiller..."
+    - helm init --client-only --skip-refresh
+    - helm repo rm stable
+    - helm repo add stable https://charts.helm.sh/stable
+    - kubectl rollout status -n "$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    - >
+       if ! helm version --debug; then
+         echo "Failed to init Tiller."
+         return 1
+       fi
+    - echo ""
+    - export track="${1-stable}"
+    - >
+      if [[ "$track" != "stable" ]]; then
+        name="$name-$track"
+      fi
+    - echo "Clone deploy repository..."
+    - git clone https://$GITLAB_HOST/$CI_PROJECT_NAMESPACE/reddit-deploy.git
+
+    - echo "Download helm dependencies..."
+    - helm dep update reddit-deploy/reddit
+
+    - eval "echo Deploy helm release $name to $KUBE_NAMESPACE"
+    - helm upgrade --install
+      --wait
+      --set ui.ingress.host="$host"
+      --set $CI_PROJECT_NAME.image.tag=$CI_APPLICATION_TAG
+      --namespace="$KUBE_NAMESPACE"
+      --version="$CI_PIPELINE_ID-$CI_JOB_ID"
+      "$name"
+      reddit-deploy/reddit/
+  variables:
+    KUBE_NAMESPACE: review
+    host: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    name: "$CI_ENVIRONMENT_SLUG"
+    KUBECONFIG: /root/config
+  environment:
+    name: review/$CI_PROJECT_PATH/$CI_COMMIT_REF_NAME
+    url: http://$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    on_stop: stop_review
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
+
+stop_review:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+    KUBECONFIG: /root/config
+    name: "$CI_ENVIRONMENT_SLUG"
+  script:
+    - echo ${kube_config} | base64 -d > ${KUBECONFIG}
+    - echo ${ca_pem} | base64 -d > /root/ca.pem
+    - apk add -U openssl curl tar gzip bash ca-certificates git
+    - wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    - wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    - apk add glibc-2.23-r3.apk
+    - rm glibc-2.23-r3.apk
+    - wget https://storage.googleapis.com/pub/gsutil.tar.gz
+    - tar -xzf gsutil.tar.gz -C $HOME
+    - export PATH=${PATH}:$HOME/gsutil
+    - echo "helm"
+    - curl https://get.helm.sh/helm-v2.13.1-linux-amd64.tar.gz | tar zx
+    - mv linux-amd64/helm /usr/bin/
+    - helm version --client
+    - curl  -o /usr/bin/sync-repo.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/sync-repo.sh
+    - chmod a+x /usr/bin/sync-repo.sh
+    - curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x /usr/bin/kubectl
+    - kubectl version --client
+    - track="${1-stable}"
+    - echo $track
+    - helm ls -A
+    - name="$CI_ENVIRONMENT_SLUG"
+    - helm delete $name -n review || true
+  environment:
+    name: review/$CI_PROJECT_PATH/$CI_COMMIT_REF_NAME
+    action: stop
+  when: manual
+  allow_failure: true
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
