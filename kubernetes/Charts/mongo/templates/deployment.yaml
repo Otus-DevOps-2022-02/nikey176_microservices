@@ -1,11 +1,11 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongo
+  name: {{ template "mongo.fullname" . }}
   labels:
     app: reddit
     component: mongo
+    release: {{ .Release.Name }}
     comment-db: "true"
     post-db: "true"
 spec:
@@ -14,12 +14,14 @@ spec:
     matchLabels:
       app: reddit
       component: mongo
+      release: {{ .Release.Name }}
   template:
     metadata:
       name: mongo
       labels:
         app: reddit
         component: mongo
+        release: {{ .Release.Name }}
         comment-db: "true"
         post-db: "true"
     spec:
@@ -30,6 +32,6 @@ spec:
         - name: mongo-persistent-storage
           mountPath: /data/db
       volumes:
-      - name: mongo-gce-pd-storage
+      - name: mongo-persistent-storage
         persistentVolumeClaim:
           claimName: mongo-pvc
