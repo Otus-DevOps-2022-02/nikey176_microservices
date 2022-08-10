@@ -237,3 +237,14 @@ Kubernetes. Networks, storages
 - в Yandex Cloud создан диск
 - настроены PersistentVolume (PV) и PersistentVolumeClaim (PVC)
 - PVC подключен к развертыванию mongo для постоянного хранения данных БД
+
+CI/CD в Kubernetes
+---
+#### 1. Работа с Helm
+- установлен Helm
+- настроены чарты для компонентов reddit-приложения
+#### 2. Развертывание Gitlab в Kubernetes
+- добавлен helm-репозиторий Gitlab
+- установлен gitlab-omnibus (внесены изменения в шаблоны для успешного запуска)
+#### 3. Запуск CI/CD в Kubernetes
+- добавлены пайплайны (.gitlab-ci.yml) для компонентов reddit-приложения
