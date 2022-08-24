@@ -1,0 +1,18 @@
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ui
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  tls:
+  - secretName: ui-ingress
+  rules:
+  - http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ui
+          servicePort: 9292
