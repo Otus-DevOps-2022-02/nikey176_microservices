@@ -1,0 +1,7 @@
+name: mongo
+version: 1.0.0
+description: OTUS reddit application DATABASE (experimental)
+maintainers:
+  - name: nikey176
+    email: chernukha84@yandex.ru
+appVersion: 1.0
